@@ -103,6 +103,26 @@ class TabularQLearningAgent(CaptureAgent):
     self.start = gameState.getAgentPosition(self.index)
     CaptureAgent.registerInitialState(self, gameState)
 
+  def calculate_reward(self, gameState, action):
+    reward = 0
+    # Ovaj reward je ukoliko nije kraj igre
+    if self.getPreviousObservation() is not None:
+      reward = self.getScore(gameState) - self.getScore(self.getPreviousObservation())
+
+    succ_state = gameState.generateSuccessor(self.index, action)
+    # Ovaj reward je ukoliko je nas agent pobedio
+    if succ_state.isOver():
+      reward = 100
+    # Ovaj reward je ukoliko protivnicki agent u sledecem
+    # potezu moze da pobedi
+    for agent in succ_state.getBlueTeamIndices():
+      for action in succ_state.getLegalActions(agent):
+        succ_succ_state = succ_state.generateSuccessor(agent, action)
+        if (succ_succ_state.isOver()):
+          reward = -100
+    
+    return reward
+
   def chooseAction(self, gameState):
     """
     Picks among actions randomly.
@@ -110,13 +130,10 @@ class TabularQLearningAgent(CaptureAgent):
     """
     # 1.  Posto nam nagrada nije data (u zadatku iz vezbi jeste), izracunaj 
     #     svojevoljno nagradu koja se dobija prelazom u drugo stanje.
-    reward = 0
-    if self.getPreviousObservation() is not None:
-      reward = self.getScore(gameState) - self.getScore(self.getPreviousObservation())
-    if gameState.isOver(): # ovo ne radi
-      reward = -100
-    print('Reward: ', reward)
     # 2.  Na osnovu nagrade, apdejtuj Q-vrednosti koje agent cuva
     # 3.  Izaberi akciju koja za stanje S ima najvecu Q vrednost (za sada random)
     actions = gameState.getLegalActions(self.index)
-    return random.choice(actions)
+    action = random.choice(actions)
+    print('Reward: ', self.calculate_reward(gameState, action))
+    
+    return action
