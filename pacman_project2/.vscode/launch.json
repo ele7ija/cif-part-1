@@ -42,7 +42,7 @@
             "request": "launch",
             "program": "capture.py",
             "console": "integratedTerminal",
-            "args": ["-r", "myTeam", "-b", "baselineTeam", "-n", "3", "-x", "2"]
+            "args": ["-r", "myTeam", "-b", "baselineTeam", "-n", "100", "-x", "99"]
         },
     ]
 }

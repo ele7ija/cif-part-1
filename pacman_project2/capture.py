@@ -448,7 +448,7 @@ class CaptureRules:
     return 1  # One second per move
 
   def getMoveTimeout(self, agentIndex):
-    return 3  # Three seconds results in instant forfeit
+    return 3.0  # Three seconds results in instant forfeit
 
   def getMaxTimeWarnings(self, agentIndex):
     return 2  # Third violation loses the game
