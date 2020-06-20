@@ -34,10 +34,18 @@
             "request": "launch",
             "program": "capture.py",
             "console": "integratedTerminal",
-            "args": ["-r", "myTeam", "-b", "baselineTeam"]
+            "args": ["-r", "myTeam", "-b", "baselineTeam", "--keys2"]
         },
         {
             "name": "MyTeam protiv Baseline tima treniranje",
+            "type": "python",
+            "request": "launch",
+            "program": "capture.py",
+            "console": "integratedTerminal",
+            "args": ["-r", "myTeam", "-b", "baselineTeam", "-n", "100", "-x", "99"]
+        },
+        {
+            "name": "MyTeam protiv Baseline tima treniranje keys",
             "type": "python",
             "request": "launch",
             "program": "capture.py",
