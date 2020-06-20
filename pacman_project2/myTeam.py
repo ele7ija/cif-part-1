@@ -14,6 +14,8 @@
 
 from captureAgents import CaptureAgent
 import random, time, util
+import distanceCalculator
+from random import random
 from game import Directions
 import game
 
@@ -294,8 +296,8 @@ class ExpectimaxAgent(CaptureAgent):
         '''
         Your initialization code goes here, if you need any.
         '''
-        self.depth = 2
-        self.evaluationFunction = scoreEvaluationFunction
+        self.depth = 1
+        self.evaluationFunction = newEvaluationFunction
 
     def chooseAction(self, gameState):
         """
@@ -305,7 +307,7 @@ class ExpectimaxAgent(CaptureAgent):
         start = time.time()
         bestVal = -1000
         bestAction = None
-        print("======= NIVO NULA ========")
+        print("======= NIVO NULA ======")
         for action in gameState.getLegalActions(self.index):
             newGameState = gameState.generateSuccessor(self.index, action)
             val = self.expectimax(newGameState, self.index+1, 1)
@@ -356,6 +358,45 @@ def scoreEvaluationFunction(currentGameState):
     """
     return currentGameState.getScore()
 
+def newEvaluationFunction(currentGameState):
+    """
+      Funkcija evaluacije
+    """
+    score = 0
+
+    newFood = currentGameState.getBlueFood()
+    newGhosts = currentGameState.getBlueTeamIndices()
+    newGhostStates = [currentGameState.getAgentState(ghost) for ghost in newGhosts]
+    newCapsules = currentGameState.getBlueCapsules()
+    for red in currentGameState.getRedTeamIndices():
+        newPos = currentGameState.getAgentState(red).getPosition()
+        closestGhost = min([manhattanDistance(newPos, ghost.getPosition()) for ghost in newGhostStates])
+        if newCapsules:
+            closestCapsule = min([manhattanDistance(newPos, caps) for caps in newCapsules])
+        else:
+            closestCapsule = 0
+
+        if closestCapsule:
+            closest_capsule = -3 / closestCapsule
+        else:
+            closest_capsule = 100
+
+        if closestGhost:
+            ghost_distance = -2 / closestGhost
+        else:
+            ghost_distance = -500
+
+        foodList = newFood.asList()
+        if foodList:
+            closestFood = min([manhattanDistance(newPos, food) for food in foodList])
+        else:
+            closestFood = 0
+
+        score += -2 * closestFood + ghost_distance*10 - 10 * len(foodList) + closest_capsule
+
+    print(score)
+    return score
+
 def betterEvaluationFunction(currentGameState):
     """
       Your extreme ghost-hunting, pellet-nabbing, food-gobbling, unstoppable
@@ -365,3 +406,7 @@ def betterEvaluationFunction(currentGameState):
     """
     "*** YOUR CODE HERE ***"
     util.raiseNotDefined()
+
+def manhattanDistance(xy1, xy2):
+    "Returns the Manhattan distance between points xy1 and xy2"
+    return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
