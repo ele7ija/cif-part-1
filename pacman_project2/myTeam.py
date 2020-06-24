@@ -28,7 +28,7 @@ from game import Actions
 # B: Ovaj numTraining=2 je quick fix jer je bacao gresku kad nema ovog
 #   keyword parametra
 def createTeam(firstIndex, secondIndex, isRed, numTraining=2,
-               first = 'ApproximateAgent', second = 'DummyAgent'):
+               first = 'ApproximateAgent', second = 'ApproximateAgent'):
   """
   This function should return a list of two agents that will form the
   team, initialized using firstIndex and secondIndex as their agent
@@ -569,6 +569,7 @@ class ApproximateAgent(CaptureAgent):
         suma = 0
         featureDict = self.featExtractor.getFeatures(state, action)
         for feature in featureDict:
+            print(featureDict[feature])
             suma += self.weights[feature] * featureDict[feature]
         # print('\tgetQvalue', time.time() - start_time)
         return suma
@@ -581,7 +582,11 @@ class ApproximateAgent(CaptureAgent):
             reward = self.getScore(succGameState) - self.getScore(succGameState)
 
         for agent in succGameState.getRedTeamIndices():
-            reward += 10 * succGameState.getAgentState(agent).numCarrying 
+            reward += 10 * succGameState.getAgentState(agent).numCarrying
+
+            for opponent in succGameState.getBlueTeamIndices():
+                if not succGameState.getAgentState(opponent).isPacman and succGameState.getAgentPosition(agent) == succGameState.getAgentPosition(opponent):
+                    reward -= 15
 
         # Ovaj reward je ukoliko je nas agent pobedio
         if succGameState.isOver():
@@ -643,9 +648,31 @@ class SimpleExtractor:
             dx, dy = Actions.directionToVector(action)
             next_x, next_y = int(x + dx), int(y + dy)
 
+            # Compute distance to closest ghost
+            opponentsState = []
+            for i in state.getBlueTeamIndices():
+                opponentsState.append(state.getAgentState(i))
+            visible = []
+            for op in opponentsState:
+                if not op.isPacman:
+                    visible.append(op)
+            if len(visible) > 0:
+                positions = [agent.getPosition() for agent in visible]
+                closest = min(positions, key=lambda xx: manhattanDistance((x, y), xx))
+                closestDist = manhattanDistance((x, y), closest)
+                print(closestDist)
+                if closestDist <= 5:
+                    features['GhostDistance'] = closestDist*0.1
+            else:
+                #probDist = []
+                #for i in state.getBlueTeamIndices():
+                #   probDist.append(state.getAgentDistances()[i])
+                # features['GhostDistance'] = min(probDist)
+                features['GhostDistance'] = 0
+
             # count the number of ghosts 1-step away
             # features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
-            features["#-of-enemies-1-step-away"] += sum((next_x, next_y) in Actions.getLegalNeighbors(e, walls) for e in enemies)
+            features["#-of-enemies-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(e, walls) for e in enemies)
 
             # if there is no danger of ghosts then add the food feature
             if features["#-of-enemies-1-step-away"] == 0 and food[next_x][next_y]:
