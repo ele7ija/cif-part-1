@@ -506,8 +506,8 @@ class ApproximateAgent(CaptureAgent):
         "*** YOUR CODE HERE ***"
         if len(legalActions) == 0:
             return None
-        if util.flipCoin(self.epsilon):
-            return random.choice(legalActions)
+        #if util.flipCoin(self.epsilon):
+        #    return random.choice(legalActions)
         
         return self.computeActionFromQValues(state)
 
@@ -572,6 +572,9 @@ class ApproximateAgent(CaptureAgent):
             print(featureDict[feature])
             suma += self.weights[feature] * featureDict[feature]
         # print('\tgetQvalue', time.time() - start_time)
+        print("STANJE")
+        print(self.weights["GhostDistance"], featureDict["GhostDistance"])
+        print(suma)
         return suma
     
 
@@ -584,10 +587,6 @@ class ApproximateAgent(CaptureAgent):
         for agent in succGameState.getRedTeamIndices():
             reward += 10 * succGameState.getAgentState(agent).numCarrying
 
-            for opponent in succGameState.getBlueTeamIndices():
-                if not succGameState.getAgentState(opponent).isPacman and succGameState.getAgentPosition(agent) == succGameState.getAgentPosition(opponent):
-                    reward -= 15
-
         # Ovaj reward je ukoliko je nas agent pobedio
         if succGameState.isOver():
             reward = 100
@@ -598,7 +597,15 @@ class ApproximateAgent(CaptureAgent):
                 succ_succ_state = succGameState.generateSuccessor(agent, action)
                 if (succ_succ_state.isOver()):
                     reward = -100
-        
+
+        for agent in succGameState.getRedTeamIndices():
+            for opponent in succGameState.getBlueTeamIndices():
+                print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
+                t = (abs(succGameState.getAgentPosition(agent)[0] - succGameState.getAgentPosition(opponent)[0]), abs(succGameState.getAgentPosition(agent)[1] - succGameState.getAgentPosition(opponent)[1]))
+                print(t)
+                if not succGameState.getAgentState(opponent).isPacman and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
+                    reward = -50
+
         return reward
 
     def update(self, state, action, nextState, reward):
@@ -617,7 +624,8 @@ class ApproximateAgent(CaptureAgent):
         print('Before: ' + str(self.weights))
         for feature in featureDict:
             self.weights[feature] = self.weights[feature] + self.alpha * difference * featureDict[feature]
-        # print('Reward: ' + str(reward) + ' Difference: ' + str(difference))
+        print("UPDATE")
+        print('Reward: ' + str(reward) + ' Difference: ' + str(difference))
         print('After: ' + str(self.weights))
 
 class SimpleExtractor:
@@ -660,9 +668,11 @@ class SimpleExtractor:
                 positions = [agent.getPosition() for agent in visible]
                 closest = min(positions, key=lambda xx: manhattanDistance((x, y), xx))
                 closestDist = manhattanDistance((x, y), closest)
+                print("DUH")
                 print(closestDist)
                 if closestDist <= 5:
-                    features['GhostDistance'] = closestDist*0.1
+                    print("POVECAJ ZA weight * ", -10.0/closestDist)
+                    features['GhostDistance'] = -10.0/closestDist
             else:
                 #probDist = []
                 #for i in state.getBlueTeamIndices():
