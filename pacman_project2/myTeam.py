@@ -603,8 +603,18 @@ class ApproximateAgent(CaptureAgent):
                 print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
                 t = (abs(succGameState.getAgentPosition(agent)[0] - succGameState.getAgentPosition(opponent)[0]), abs(succGameState.getAgentPosition(agent)[1] - succGameState.getAgentPosition(opponent)[1]))
                 print(t)
-                if not succGameState.getAgentState(opponent).isPacman and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
-                    reward = -50
+                if not succGameState.getAgentState(opponent).isPacman and succGameState.getAgentState(opponent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
+                    if succGameState.getAgentState(agent).numCarrying > 5:
+                        reward = -100
+                    else:
+                        reward = -50
+
+                if not succGameState.getAgentState(agent).isPacman and succGameState.getAgentState(opponent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
+                    reward = 100
+
+            for capsule in succGameState.getBlueCapsules():
+                if succGameState.getAgentPosition(agent) == capsule:
+                    reward += 50
 
         return reward
 
@@ -693,6 +703,26 @@ class SimpleExtractor:
                 # make the distance a number less than one otherwise the update
                 # will diverge wildly
                 features["closest-food"] += float(dist) / (walls.width * walls.height)
+
+            foodList = food.asList()
+            features['successorScore'] = -len(foodList)
+
+            features["carryingFood"] += state.getAgentState(friend).numCarrying
+           # if features["carryingFood"] > 5:
+           #     features["closest-food"] = 0
+
+            capsulesChasing = state.getBlueCapsules()
+            capsulesChasingDistances = [manhattanDistance((x, y), capsule) for capsule in capsulesChasing]
+            minCapsuleDistance = min(capsulesChasingDistances) if len(capsulesChasingDistances) else 0
+            features["distanceToCapsule"] = minCapsuleDistance
+
+            enemiesAgents = [state.getAgentState(i) for i in state.getBlueTeamIndices()]
+            invaders = [a for a in enemiesAgents if a.isPacman]
+            features['numInvaders'] = len(invaders)
+            if len(invaders) > 0:
+                dists = [manhattanDistance((x, y), a.getPosition()) for a in invaders]
+                features['invaderDistance'] = min(dists)
+
         features.divideAll(10.0)
         return features
 
