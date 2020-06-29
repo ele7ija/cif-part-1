@@ -425,7 +425,7 @@ class ApproximateAgent(CaptureAgent):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.featExtractor = SimpleExtractor()
+        self.featExtractor = AdvancedExtractor()
         self.weights = util.Counter()
         self.epsilon=0.1
         self.gamma=0.8
@@ -474,13 +474,13 @@ class ApproximateAgent(CaptureAgent):
         """
         start_time = time.time()
         action = self.calculateAction(gameState)
-        print('calculate_action: ', time.time() - start_time)
+        # print('calculate_action: ', time.time() - start_time)
         # actions = gameState.getLegalActions(self.index)
         # action = random.choice(actions)
         succ_state = gameState.generateSuccessor(self.index, action)
         # print('succ_state: ', time.time() - start_time)
-        reward = self.calculate_reward(gameState, action, succ_state)
-        print('reward: ', time.time() - start_time)
+        reward = self.calculate_reward(gameState, action, succ_state, self.index)
+        # print('reward: ', time.time() - start_time)
 
         if reward != 0:
             print('Reward: ', reward)
@@ -506,8 +506,8 @@ class ApproximateAgent(CaptureAgent):
         "*** YOUR CODE HERE ***"
         if len(legalActions) == 0:
             return None
-        #if util.flipCoin(self.epsilon):
-        #    return random.choice(legalActions)
+        # if util.flipCoin(self.epsilon):
+        #     return random.choice(legalActions)
         
         return self.computeActionFromQValues(state)
 
@@ -567,54 +567,115 @@ class ApproximateAgent(CaptureAgent):
         "*** YOUR CODE HERE ***"
         start_time = time.time()
         suma = 0
-        featureDict = self.featExtractor.getFeatures(state, action)
+        featureDict = self.featExtractor.getFeatures(state, action, self.index)
         for feature in featureDict:
-            print(featureDict[feature])
             suma += self.weights[feature] * featureDict[feature]
-        # print('\tgetQvalue', time.time() - start_time)
-        print("STANJE")
-        print(self.weights["GhostDistance"], featureDict["GhostDistance"])
-        print(suma)
+        print('Q value: ', suma)
         return suma
     
 
-    def calculate_reward(self, gameState, action, succGameState):
+    def calculate_reward(self, gameState, action, succGameState, agent):
+        '''
+        calculate_reward 2.0:
+            Uzimamo u obzir koji je agent u pitanju, jer je ucenje agenata nezavisno
+        '''
         reward = 0
         # Ovaj reward je ukoliko nije kraj igre
         if self.getPreviousObservation() is not None:
-            reward = self.getScore(succGameState) - self.getScore(succGameState)
+            reward += 20 * (self.getScore(succGameState) - self.getScore(gameState))
+            if (reward != 0):
+                print('stop')
 
-        for agent in succGameState.getRedTeamIndices():
-            reward += 10 * succGameState.getAgentState(agent).numCarrying
+        reward += 10 * (succGameState.getAgentState(agent).numCarrying - gameState.getAgentState(agent).numCarrying)
+        if succGameState.getAgentState(agent).numCarrying - gameState.getAgentState(agent).numCarrying != 0:
+            print('stop')
+
+        reward += 20 * succGameState.getAgentState(agent).numReturned
 
         # Ovaj reward je ukoliko je nas agent pobedio
         if succGameState.isOver():
             reward = 100
         # Ovaj reward je ukoliko protivnicki agent u sledecem
         # potezu moze da pobedi
-        for agent in succGameState.getBlueTeamIndices():
-            for action in succGameState.getLegalActions(agent):
-                succ_succ_state = succGameState.generateSuccessor(agent, action)
+        for opponent in succGameState.getBlueTeamIndices():
+            for action in succGameState.getLegalActions(opponent):
+                succ_succ_state = succGameState.generateSuccessor(opponent, action)
                 if (succ_succ_state.isOver()):
-                    reward = -100
+                    reward = -50
 
-        for agent in succGameState.getRedTeamIndices():
-            for opponent in succGameState.getBlueTeamIndices():
-                print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
-                t = (abs(succGameState.getAgentPosition(agent)[0] - succGameState.getAgentPosition(opponent)[0]), abs(succGameState.getAgentPosition(agent)[1] - succGameState.getAgentPosition(opponent)[1]))
-                print(t)
-                if not succGameState.getAgentState(opponent).isPacman and succGameState.getAgentState(opponent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
-                    if succGameState.getAgentState(agent).numCarrying > 5:
-                        reward = -100
-                    else:
-                        reward = -50
+        # for opponent in succGameState.getBlueTeamIndices():
+        #     print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
+        #     t = (abs(succGameState.getAgentPosition(agent)[0] - succGameState.getAgentPosition(opponent)[0]), abs(succGameState.getAgentPosition(agent)[1] - succGameState.getAgentPosition(opponent)[1]))
+        #     print(t)
+        #     if not succGameState.getAgentState(opponent).isPacman and succGameState.getAgentState(opponent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
+        #         if succGameState.getAgentState(agent).numCarrying > 5:
+        #             reward = -10
+        #         else:
+        #             reward = 0
 
-                if not succGameState.getAgentState(agent).isPacman and succGameState.getAgentState(opponent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
-                    reward = 100
+        #     if not succGameState.getAgentState(agent).isPacman and succGameState.getAgentState(agent).scaredTimer == 0 and (t == (0,0) or t == (0,1) or t == (1,0) or t == (1, 1)):
+        #         reward = 10
+        
+        # Rewards for eating agents
+        agent_pos = succGameState.getAgentPosition(agent)
+        agent_state = succGameState.getAgentState(agent)
+        for enemy_index in gameState.getBlueTeamIndices():
+            if self.getPreviousObservation() is None:
+                continue
+            enemy_pos = self.getPreviousObservation().getAgentPosition(enemy_index)
+            next_enemy_pos = succGameState.getAgentPosition(enemy_index)
+            t = (abs(next_enemy_pos[0] - enemy_pos[0]), abs(next_enemy_pos[1] - enemy_pos[1]))
+            if not(t == (0, 1) or t == (1, 0) or t == (0, 0)):
+                enemy_state = succGameState.getAgentState(enemy_index)
+                # our ghost eaten their pacman
+                if not agent_state.isPacman and agent_state.scaredTimer == 0:
+                    reward = 25
+                # our pacman eats their scared ghost
+                if agent_state.isPacman and enemy_state.scaredTimer != 0:
+                    reward = 30
+            
+                # # their pacman eats our scared ghost
+                # if opp_state.isPacman and agent_state.scaredTimer != 0:
+                #     reward = -10
+                # # their ghost eats our pacman
+                # if not opp_state.isPacman and opp_state.scaredTimer == 0:
+                #     reward = -3 * agent_state.numCarrying
+        # Reward for potential of getting eaten
+        agent_state = succGameState.getAgentState(agent)
+        agent_pos = succGameState.getAgentPosition(agent)
+        for enemy_index in succGameState.getBlueTeamIndices():
+            enemy_pos = succGameState.getAgentPosition(enemy_index)
+            enemy_state = succGameState.getAgentState(enemy_index)
+            t = (abs(agent_pos[0] - enemy_pos[0]), abs(agent_pos[1] - enemy_pos[1]))
+            if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+                if agent_state.isPacman and enemy_state.scaredTimer == 0:
+                    reward = min(-6, -3 * agent_state.numCarrying) 
 
-            for capsule in succGameState.getBlueCapsules():
-                if succGameState.getAgentPosition(agent) == capsule:
-                    reward += 50
+        
+    # OLD
+        # for opponent in succGameState.getBlueTeamIndices():
+        #     opp_pos = succGameState.getAgentPosition(opponent)
+        #     t = (abs(agent_pos[0] - opp_pos[0]), abs(agent_pos[1] - opp_pos[1]))
+        #     if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+        #         opp_state = succGameState.getAgentState(opponent)
+        #         # our ghost eats their pacman
+        #         if not agent_state.isPacman and agent_state.scaredTimer == 0:
+        #             reward = 25
+        #         # our pacman eats their scared ghost
+        #         if agent_state.isPacman and opp_state.scaredTimer != 0:
+        #             reward = 30
+        #         # their pacman eats our scared ghost
+        #         if opp_state.isPacman and agent_state.scaredTimer != 0:
+        #             reward = -10
+        #         # their ghost eats our pacman
+        #         if not opp_state.isPacman and opp_state.scaredTimer == 0:
+        #             reward = -3 * agent_state.numCarrying
+            
+
+
+        for capsule in succGameState.getBlueCapsules():
+            if succGameState.getAgentPosition(agent) == capsule:
+                reward += 50
 
         return reward
 
@@ -629,8 +690,10 @@ class ApproximateAgent(CaptureAgent):
         """
         "*** YOUR CODE HERE ***"
         observedVal = reward + self.gamma * self.computeValueFromQValues(state)
+        if reward != 0:
+            print(' ')
         difference = observedVal - self.getQValue(state, action)
-        featureDict = self.featExtractor.getFeatures(state, action)
+        featureDict = self.featExtractor.getFeatures(state, action, self.index)
         print('Before: ' + str(self.weights))
         for feature in featureDict:
             self.weights[feature] = self.weights[feature] + self.alpha * difference * featureDict[feature]
@@ -647,7 +710,7 @@ class SimpleExtractor:
     - whether a ghost is one step away
     """
 
-    def getFeatures(self, state, action):
+    def getFeatures(self, state, action, agent):
         # extract the grid of food and wall locations and get the ghost locations
         food = state.getBlueFood()
         walls = state.getWalls()
@@ -659,71 +722,198 @@ class SimpleExtractor:
 
         features["bias"] = 1.0
 
-        for friend in state.getRedTeamIndices():
-            # compute the location of pacman after he takes the action
-            # x, y = state.getPacmanPosition()
-            x, y = state.getAgentPosition(friend)
-            dx, dy = Actions.directionToVector(action)
-            next_x, next_y = int(x + dx), int(y + dy)
+        # compute the location of pacman after he takes the action
+        # x, y = state.getPacmanPosition()
+        x, y = state.getAgentPosition(agent)
+        dx, dy = Actions.directionToVector(action)
+        next_x, next_y = int(x + dx), int(y + dy)
 
-            # Compute distance to closest ghost
-            opponentsState = []
-            for i in state.getBlueTeamIndices():
-                opponentsState.append(state.getAgentState(i))
-            visible = []
-            for op in opponentsState:
-                if not op.isPacman:
-                    visible.append(op)
-            if len(visible) > 0:
-                positions = [agent.getPosition() for agent in visible]
-                closest = min(positions, key=lambda xx: manhattanDistance((x, y), xx))
-                closestDist = manhattanDistance((x, y), closest)
-                print("DUH")
-                print(closestDist)
-                if closestDist <= 5:
-                    print("POVECAJ ZA weight * ", -10.0/closestDist)
-                    features['GhostDistance'] = -10.0/closestDist
+        # Compute distance to closest ghost
+        # Distanca od 1 znaci najveca udaljenost
+        # Agent treba da podesi tezine da vrednuju ovaj feature:
+        # Da ukoliko je ghostDistance velik, njegov uticaj na Q bude 
+        # pozitivan, tj. ukoliko je mali (duh je blizu) da uticaj bude negativan
+        # Tako agent bira stanja kod kojih je ghostDistance sto veci
+        features['GhostDistance' + str(agent)] = 1 
+        opponentsState = []
+        for i in state.getBlueTeamIndices():
+            opponentsState.append(state.getAgentState(i))
+        visible = []
+        for op in opponentsState:
+            if not op.isPacman:
+                visible.append(op)
+        if len(visible) > 0:
+            positions = [agent.getPosition() for agent in visible]
+            closest = min(positions, key=lambda xx: manhattanDistance((x, y), xx))
+            closestDist = manhattanDistance((x, y), closest)
+            print("DUH")
+            print(closestDist)
+            if closestDist <= 10:
+                print("POVECAJ ZA weight * ", closestDist/10) # delimo sa 100 da feature bude manji od 1
+                features['GhostDistance' + str(agent)] = closestDist/10 
+
+        # count the number of ghosts 1-step away
+        # features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
+        features["#-of-enemies-1-step-away"] += sum((next_x, next_y) in Actions.getLegalNeighbors(e, walls) for e in enemies)
+
+        # if there is no danger of ghosts then add the food feature
+        if food[next_x][next_y]:
+            features["eats-food" + str(agent)] += 1.0
+
+        dist = closestFood((next_x, next_y), food, walls)
+        if dist is not None:
+            # make the distance a number less than one otherwise the update
+            # will diverge wildly
+            features["closest-food" + str(agent)] = 1 - 10 * float(dist) / (walls.width * walls.height)
+
+        # foodList = food.asList()
+        # features['successorScore'] = -len(foodList)
+
+        nextState2 = state.generateSuccessor(agent, action)
+        features["carryingFood" + str(agent)] = state.getAgentState(agent).numCarrying
+        # if features["carryingFood"] > 5:
+        #     features["closest-food"] = 0
+
+        capsulesChasing = state.getBlueCapsules()
+        capsulesChasingDistances = [manhattanDistance((x, y), capsule) for capsule in capsulesChasing]
+        minCapsuleDistance = min(capsulesChasingDistances) if len(capsulesChasingDistances) else 0
+        features["distanceToCapsule" + str(agent)] = minCapsuleDistance / 100 # da bude 0 < feature < 1
+
+        enemiesAgents = [state.getAgentState(i) for i in state.getBlueTeamIndices()]
+        invaders = [a for a in enemiesAgents if a.isPacman]
+        # features['numInvaders'] = 1 / len(invaders) if len(invaders) != 0 else 1 # sto je manji broj to je gore - inverzan feature
+        if len(invaders) > 0:
+            dists = [manhattanDistance((x, y), a.getPosition()) for a in invaders]
+            features['invaderDistance' + str(agent)] = 1 - min(dists) / 100 # da bude 0 < feature < 1
+            features['invaderDistance' + str(agent)]/=10
+
+        ###########################################
+        # Feature: 'scores'
+        # Agent indeksa 'agent' ce u narednom potezu postici rezultat
+        # Opseg vrednosti: 0.00 ili 1.00
+        ###########################################
+        nextState = state.generateSuccessor(agent, action)
+        features['scores' + str(agent)] = 1.0 if nextState.getScore() > state.getScore() else 0.0
+
+
+        #features.divideAll(10.0)
+        return features
+
+class AdvancedExtractor:
+    """
+    Vraća osobine stanja koje bi trebalo da budu relevatne za Pacmana
+    Osobine:
+        1. 
+    """
+
+    def getFeatures(self, state, action, agent):
+        features = util.Counter()
+
+        ###### Feature 1: bias 
+        features["bias"] = 1.0
+        ###################################################
+
+        ###### Feature 2: closest-food
+        food = state.getBlueFood()
+        walls = state.getWalls()
+        x, y = state.getAgentPosition(agent)
+        dx, dy = Actions.directionToVector(action)
+        next_x, next_y = int(x + dx), int(y + dy)
+
+        dist = closestFood((next_x, next_y), food, walls)
+        if dist is not None:
+            features["closest-food"] = float(dist) / (walls.width * walls.height)
+
+        if food[next_x][next_y]:
+            features['eats-food'] = 1.0
+
+        # features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(e, walls) for e in ghosts)
+        ###################################################
+
+        ###### Feature 3: food-carrying
+        next_state = state.generateSuccessor(agent, action)
+        features["carrying-food"] = next_state.getAgentState(agent).numCarrying / 20
+        ###################################################
+
+        ###### Feature 4: food-carrying-enemies
+        # for enemy_index in state.getBlueTeamIndices():
+        #     features["carrying-food-enemies"] += next_state.getAgentState(enemy_index).numCarrying / 20
+        ###################################################
+
+        ###### Feature 5: invader-distances
+        ###### Feature 6: non-invader-distances
+        ###### Feature 7: #-of-invaders
+        for enemy_index in state.getBlueTeamIndices():
+            enemy_state = next_state.getAgentState(enemy_index)
+            enemy_pos = next_state.getAgentPosition(enemy_index)
+            # TODO A*
+            enemy_md = manhattanDistance((x, y), enemy_pos) 
+            if enemy_state.isPacman:
+                features['invader-distances'] += 1.0 / len(state.getBlueTeamIndices()) * \
+                (float(enemy_md) / (walls.width * walls.height))
             else:
-                #probDist = []
-                #for i in state.getBlueTeamIndices():
-                #   probDist.append(state.getAgentDistances()[i])
-                # features['GhostDistance'] = min(probDist)
-                features['GhostDistance'] = 0
+                features['non-invader-distances'] += 1.0 / len(state.getBlueTeamIndices()) * \
+                ( float(enemy_md) / (walls.width * walls.height))
+                # features['#-of-non-invaders'] += 1.0 / len(state.getBlueTeamIndices())
+        ###################################################
 
-            # count the number of ghosts 1-step away
-            # features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
-            features["#-of-enemies-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(e, walls) for e in enemies)
+        ###### Feature 8: #-of-us-our-terit
+        # for friend_index in state.getRedTeamIndices():
+        #     # TODO prepisati da koristi agentState
+        #     friend_pos = next_state.getAgentPosition(friend_index)
+        #     flag = True if friend_pos[0] <= (walls.width / 2) else False
+        #     features["#-of-us-our-terit"] += 1.0 / len(state.getBlueTeamIndices()) if flag else 0.0
+        ###################################################
 
-            # if there is no danger of ghosts then add the food feature
-            if features["#-of-enemies-1-step-away"] == 0 and food[next_x][next_y]:
-                features["eats-food"] += 1.0
+        ###### Feature 9: returns-food-home
+        # TODO prepisati da koristi agentState
+        if (x == walls.width / 2) and (next_x == walls.width / 2 - 1):
+            features['returns-food-home'] = max(0.2, next_state.getAgentState(agent).numCarrying / 20)
+        ###################################################
 
-            dist = closestFood((next_x, next_y), food, walls)
-            if dist is not None:
-                # make the distance a number less than one otherwise the update
-                # will diverge wildly
-                features["closest-food"] += float(dist) / (walls.width * walls.height)
+        ###### Feature 10: eats-enemy
+        # agent_state = next_state.getAgentState(agent)
+        # for enemy_index in state.getBlueTeamIndices():
+        #     enemy_pos = next_state.getAgentPosition(enemy_index)
+        #     t = (abs(next_x - enemy_pos[0]), abs(next_y - enemy_pos[1]))
+        #     if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+        #         if not agent_state.isPacman and agent_state.scaredTimer == 0:
+        #             features['can-eat-enemy'] = 1.0
+        #         if not agent_state.isPacman and agent_state.scaredTimer != 0:
+        #             features['can-get-eaten'] = 1.0
+        ###################################################
 
-            foodList = food.asList()
-            features['successorScore'] = -len(foodList)
+        ##### Feature 11: enemy-eaten
+        for enemy_index in state.getBlueTeamIndices():
+            enemy_pos = state.getAgentPosition(enemy_index)
+            next_enemy_pos = next_state.getAgentPosition(enemy_index)
+            t = (abs(next_enemy_pos[0] - enemy_pos[0]), abs(next_enemy_pos[1] - enemy_pos[1]))
+            if not(t == (0, 1) or t == (1, 0) or t == (0, 0)):
+                features['enemy-eaten'] = 1.0
+                # TODO razlika da li je nas duh pojeo pakmena 
+                # il je nas pakmen pojeo uplasenog duha
+        ###################################################
 
-            features["carryingFood"] += state.getAgentState(friend).numCarrying
-           # if features["carryingFood"] > 5:
-           #     features["closest-food"] = 0
+        ###### Feature 12: can-get-eaten
+        # prev_state = self.getPreviousObservation()
+        # if prev_state is not None:
+        #     prev_pos = prev_state.getAgentPosition(agent)
+        #     pos = next_state.getAgentPosition(agent)
+        #     t = (abs(pos[0] - prev_pos[0]), abs(pos[1] - prev_pos[1]))
+        #     if not(t == (0, 1) or t == (1, 0) or t == (0, 0)):
+        #         features['got-eaten'] = 1.0
 
-            capsulesChasing = state.getBlueCapsules()
-            capsulesChasingDistances = [manhattanDistance((x, y), capsule) for capsule in capsulesChasing]
-            minCapsuleDistance = min(capsulesChasingDistances) if len(capsulesChasingDistances) else 0
-            features["distanceToCapsule"] = minCapsuleDistance
-
-            enemiesAgents = [state.getAgentState(i) for i in state.getBlueTeamIndices()]
-            invaders = [a for a in enemiesAgents if a.isPacman]
-            features['numInvaders'] = len(invaders)
-            if len(invaders) > 0:
-                dists = [manhattanDistance((x, y), a.getPosition()) for a in invaders]
-                features['invaderDistance'] = min(dists)
-
-        features.divideAll(10.0)
+        agent_state = next_state.getAgentState(agent)
+        for enemy_index in state.getBlueTeamIndices():
+            enemy_pos = next_state.getAgentPosition(enemy_index)
+            enemy_state = next_state.getAgentState(enemy_index)
+            t = (abs(next_x - enemy_pos[0]), abs(next_y - enemy_pos[1]))
+            if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+                if agent_state.isPacman and enemy_state.scaredTimer == 0:
+                    features['can-get-eaten'] = 1.0
+        ###################################################
+        # TODO feature udaljenost od svoje polovine
+        # TODO feature agent-eaten
         return features
 
 def closestFood(pos, food, walls):
@@ -741,12 +931,12 @@ def closestFood(pos, food, walls):
         expanded.add((pos_x, pos_y))
         # if we find a food at this location then exit
         if food[pos_x][pos_y]:
-            print('closestFood', time.time() - start_time)
+            #print('closestFood', time.time() - start_time)
             return dist
         # otherwise spread out from the location to its neighbours
         nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
         for nbr_x, nbr_y in nbrs:
             fringe.append((nbr_x, nbr_y, dist+1))
     # no food found
-    print('closestFood', time.time() - start_time)
+    #print('closestFood', time.time() - start_time)
     return None

@@ -42,7 +42,7 @@
             "request": "launch",
             "program": "capture.py",
             "console": "integratedTerminal",
-            "args": ["-r", "myTeam", "-b", "baselineTeam", "-n", "100", "-x", "99"]
+            "args": ["-r", "myTeam", "-b", "baselineTeam", "-n", "100", "-x", "20"]
         },
         {
             "name": "MyTeam protiv Baseline tima treniranje keys",
