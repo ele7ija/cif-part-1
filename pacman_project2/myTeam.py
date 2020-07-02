@@ -430,7 +430,7 @@ class ApproximateAgent(CaptureAgent):
         self.epsilon=0.1
         self.gamma=0.8
         self.alpha=0.2
-
+        self.num_games = 0
 
     def registerInitialState(self, gameState):
         """
@@ -456,7 +456,7 @@ class ApproximateAgent(CaptureAgent):
         '''
         Your initialization code goes here, if you need any.
         '''
-        
+        self.num_games += 1
 
 
     def chooseAction(self, gameState):
@@ -506,8 +506,10 @@ class ApproximateAgent(CaptureAgent):
         "*** YOUR CODE HERE ***"
         if len(legalActions) == 0:
             return None
-        # if util.flipCoin(self.epsilon):
-        #     return random.choice(legalActions)
+        
+        prob = 0.9 - 0.8 * self.num_games / 100
+        if util.flipCoin(prob):
+            return random.choice(legalActions)
         
         return self.computeActionFromQValues(state)
 
@@ -597,11 +599,11 @@ class ApproximateAgent(CaptureAgent):
             reward = 100
         # Ovaj reward je ukoliko protivnicki agent u sledecem
         # potezu moze da pobedi
-        for opponent in succGameState.getBlueTeamIndices():
-            for action in succGameState.getLegalActions(opponent):
-                succ_succ_state = succGameState.generateSuccessor(opponent, action)
-                if (succ_succ_state.isOver()):
-                    reward = -50
+        # for opponent in succGameState.getBlueTeamIndices():
+        #     for action in succGameState.getLegalActions(opponent):
+        #         succ_succ_state = succGameState.generateSuccessor(opponent, action)
+        #         if (succ_succ_state.isOver()):
+        #             reward = -50
 
         # for opponent in succGameState.getBlueTeamIndices():
         #     print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
@@ -822,7 +824,7 @@ class AdvancedExtractor:
 
         dist = closestFood((next_x, next_y), food, walls)
         if dist is not None:
-            features["closest-food"] = float(dist) / (walls.width * walls.height)
+            features["closest-food"] = 10 * float(dist) / (walls.width * walls.height)
 
         if food[next_x][next_y]:
             features['eats-food'] = 1.0
@@ -850,10 +852,10 @@ class AdvancedExtractor:
             enemy_md = manhattanDistance((x, y), enemy_pos) 
             if enemy_state.isPacman:
                 features['invader-distances'] += 1.0 / len(state.getBlueTeamIndices()) * \
-                (float(enemy_md) / (walls.width * walls.height))
+                (10 * float(enemy_md) / (walls.width * walls.height))
             else:
                 features['non-invader-distances'] += 1.0 / len(state.getBlueTeamIndices()) * \
-                ( float(enemy_md) / (walls.width * walls.height))
+                (10 * float(enemy_md) / (walls.width * walls.height))
                 # features['#-of-non-invaders'] += 1.0 / len(state.getBlueTeamIndices())
         ###################################################
 
