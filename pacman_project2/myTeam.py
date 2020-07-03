@@ -507,9 +507,12 @@ class ApproximateAgent(CaptureAgent):
         if len(legalActions) == 0:
             return None
         
-        prob = 0.9 - 0.8 * self.num_games / 100
-        if util.flipCoin(prob):
-            return random.choice(legalActions)
+        #prob = 0.9 - 0.8 * self.num_games / 100
+        #if util.flipCoin(prob):
+        #    return random.choice(legalActions)
+
+        if util.flipCoin(self.epsilon):
+           return random.choice(legalActions)
         
         return self.computeActionFromQValues(state)
 
@@ -599,11 +602,11 @@ class ApproximateAgent(CaptureAgent):
             reward = 100
         # Ovaj reward je ukoliko protivnicki agent u sledecem
         # potezu moze da pobedi
-        # for opponent in succGameState.getBlueTeamIndices():
-        #     for action in succGameState.getLegalActions(opponent):
-        #         succ_succ_state = succGameState.generateSuccessor(opponent, action)
-        #         if (succ_succ_state.isOver()):
-        #             reward = -50
+        for opponent in succGameState.getBlueTeamIndices():
+            for action in succGameState.getLegalActions(opponent):
+                succ_succ_state = succGameState.generateSuccessor(opponent, action)
+                if (succ_succ_state.isOver()):
+                    reward = -10
 
         # for opponent in succGameState.getBlueTeamIndices():
         #     print("POZICIJE: ", succGameState.getAgentPosition(agent), succGameState.getAgentPosition(opponent))
@@ -649,12 +652,14 @@ class ApproximateAgent(CaptureAgent):
             enemy_pos = succGameState.getAgentPosition(enemy_index)
             enemy_state = succGameState.getAgentState(enemy_index)
             t = (abs(agent_pos[0] - enemy_pos[0]), abs(agent_pos[1] - enemy_pos[1]))
-            if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
-                if agent_state.isPacman and enemy_state.scaredTimer == 0:
-                    reward = min(-6, -3 * agent_state.numCarrying) 
+            if agent_state.isPacman and enemy_state.scaredTimer == 0:
+                if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+                    reward = min(-6, -3* agent_state.numCarrying)
+                elif t[0] + t[1] <= 5:
+                    reward = min(-2, -1 * agent_state.numCarrying)
 
-        
-    # OLD
+
+                   # OLD
         # for opponent in succGameState.getBlueTeamIndices():
         #     opp_pos = succGameState.getAgentPosition(opponent)
         #     t = (abs(agent_pos[0] - opp_pos[0]), abs(agent_pos[1] - opp_pos[1]))
@@ -849,7 +854,8 @@ class AdvancedExtractor:
             enemy_state = next_state.getAgentState(enemy_index)
             enemy_pos = next_state.getAgentPosition(enemy_index)
             # TODO A*
-            enemy_md = manhattanDistance((x, y), enemy_pos) 
+            #enemy_md = manhattanDistance((x, y), enemy_pos)
+            enemy_md = distance((x, y), enemy_pos, walls)
             if enemy_state.isPacman:
                 features['invader-distances'] += 1.0 / len(state.getBlueTeamIndices()) * \
                 (10 * float(enemy_md) / (walls.width * walls.height))
@@ -910,7 +916,8 @@ class AdvancedExtractor:
             enemy_pos = next_state.getAgentPosition(enemy_index)
             enemy_state = next_state.getAgentState(enemy_index)
             t = (abs(next_x - enemy_pos[0]), abs(next_y - enemy_pos[1]))
-            if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+            #if t == (0, 1) or t == (1, 0) or t == (0, 0) or t == (1, 1):
+            if t[0] + t[1] <= 5:
                 if agent_state.isPacman and enemy_state.scaredTimer == 0:
                     features['can-get-eaten'] = 1.0
         ###################################################
@@ -933,6 +940,31 @@ def closestFood(pos, food, walls):
         expanded.add((pos_x, pos_y))
         # if we find a food at this location then exit
         if food[pos_x][pos_y]:
+            #print('closestFood', time.time() - start_time)
+            return dist
+        # otherwise spread out from the location to its neighbours
+        nbrs = Actions.getLegalNeighbors((pos_x, pos_y), walls)
+        for nbr_x, nbr_y in nbrs:
+            fringe.append((nbr_x, nbr_y, dist+1))
+    # no food found
+    #print('closestFood', time.time() - start_time)
+    return None
+
+def distance(pos, pos2, walls):
+    """
+    closestFood -- this is similar to the function that we have
+    worked on in the search project; here its all in one place
+    """
+    start_time = time.time()
+    fringe = [(pos[0], pos[1], 0)]
+    expanded = set()
+    while fringe:
+        pos_x, pos_y, dist = fringe.pop(0)
+        if (pos_x, pos_y) in expanded:
+            continue
+        expanded.add((pos_x, pos_y))
+        # if we find a food at this location then exit
+        if (pos_x, pos_y) == pos2:
             #print('closestFood', time.time() - start_time)
             return dist
         # otherwise spread out from the location to its neighbours
