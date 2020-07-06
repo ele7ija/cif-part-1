@@ -427,7 +427,7 @@ class ApproximateAgent(CaptureAgent):
 
         # Postavka za pokretanje vec treniranih agenata na 200 igara.
         # Potrebno je zakomentarisati i random selekciju akcija
-        self.weights = {'bias': 1.3092480821245795, 'closest-food': -26.129769321065581, 'carrying-food': -17.22975776300706, 'invader-distances': -20.015589895371805, 'can-eat-enemy': 50.44534789948978, 'enemy-eaten': 117.25849008034925, 'non-invader-distances': 10.564552894428572, 'returns-food-home': 183.781861600454022, 'can-get-eaten': 2.075132783147235, 'eats-food': 46.07694128330801, 'home-distance': -25.3568123111908720}
+        self.weights = {'bias': 1.3092480821245795, 'closest-food': -26.129769321065581, 'carrying-food': -17.22975776300706, 'invader-distances': -20.015589895371805, 'can-eat-enemy': 50.44534789948978, 'enemy-eaten': 117.25849008034925, 'non-invader-distances': 70.564552894428572, 'returns-food-home': 183.781861600454022, 'can-get-eaten': 2.075132783147235, 'eats-food': 46.07694128330801, 'home-distance': -25.3568123111908720}
         
         # Postavka tezina za dugotrajno treniranje
         # self.weights['bias'] = random.randrange(-5, 6, 1)
@@ -445,7 +445,7 @@ class ApproximateAgent(CaptureAgent):
         # self.weights = util.Counter()
         self.epsilon=0.1
         self.gamma=0.8
-        self.alpha=0.2
+        self.alpha=0.04
         self.num_games = 0
 
     def registerInitialState(self, gameState):
@@ -865,6 +865,8 @@ class AdvancedExtractor:
         dist = closestFood((next_x, next_y), food, walls)
         if dist is not None:
             features["closest-food"] = 10 * float(dist) / (walls.width * walls.height)
+        else:
+            features['returns-food-home'] = 1.0
 
         if food[next_x][next_y]:
             features['eats-food'] = 1.0
@@ -957,12 +959,28 @@ class AdvancedExtractor:
                     if dist <= 6 and dist > 3:
                         # features['can-get-eaten'] = 0.8
                         features['closest-food'] = 0.0
-                        dist = distance((walls.width/2 - 1, agent_pos[1]), agent_pos, walls)
-                        features['home-distance'] = 10 * float(dist) / (walls.width * walls.height)
+                        home_dist = 100
+                        min_j = 0
+                        for j in range(0, int(walls.height)-1):
+                            if walls.data[int(walls.width/2)][j] or walls.data[int(walls.width/2) - 1][j]:
+                                continue 
+                            dist = distance((walls.width/2 - 1, j), agent_pos, walls)
+                            if dist < home_dist:
+                                min_j = j
+                                home_dist = dist
+                        features['home-distance'] = 10 * float(home_dist) / (walls.width * walls.height)
                     elif dist <= 3:
                         features['closest-food'] = 0.0
-                        dist = distance((walls.width/2 - 1, agent_pos[1]), agent_pos, walls)
-                        features['home-distance'] = 10 * float(dist) / (walls.width * walls.height)
+                        home_dist = 100
+                        min_j = 0
+                        for j in range(0, int(walls.height)-1):
+                            if walls.data[int(walls.width/2)][j] or walls.data[int(walls.width/2) - 1][j]:
+                                continue 
+                            dist = distance((walls.width/2 - 1, j), agent_pos, walls)
+                            if dist < home_dist:
+                                min_j = j
+                                home_dist = dist
+                        features['home-distance'] = 10 * float(home_dist) / (walls.width * walls.height)
                     
                 # if dist < 8 and dist > 4:
                 #     # features['can-get-eaten'] = 0.8
@@ -994,7 +1012,21 @@ class AdvancedExtractor:
                         features['returns-food-home'] = 1.0
                     else:
                         features['closest-food'] = 0.0
+            elif not agent_state.isPacman and enemy_state.isPacman and agent_state.scaredTimer != 0:
+                features['invader-distances'] = 0.0
 
+        if agent_state.numCarrying >= 6 and features['returns-food-home'] < 0.8:
+            features['closest-food'] = 0.0
+            home_dist = 100
+            min_j = 0
+            for j in range(0, int(walls.height)-1):
+                if walls.data[int(walls.width/2)][j] or walls.data[int(walls.width/2) - 1][j]:
+                    continue 
+                dist = distance((walls.width/2 - 1, j), agent_pos, walls)
+                if dist < home_dist:
+                    min_j = j
+                    home_dist = dist
+            features['home-distance'] = 10 * float(home_dist) / (walls.width * walls.height)
 
         ###################################################
         # TODO feature udaljenost od svoje polovine
